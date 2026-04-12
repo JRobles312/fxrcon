@@ -21,7 +21,6 @@ app.post("/api/submit-lead", async (req, res) => {
   }
 
   try {
-    // Step 1: Find the organization ID by slug
     const orgRes = await fetch(JOBTREAD_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -45,7 +44,6 @@ app.post("/api/submit-lead", async (req, res) => {
       return res.status(500).json({ error: "Could not locate JobTread organization." });
     }
 
-    // Step 2: Create the customer in JobTread
     const customerRes = await fetch(JOBTREAD_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -77,7 +75,6 @@ app.post("/api/submit-lead", async (req, res) => {
       return res.status(500).json({ error: "Could not create customer in JobTread." });
     }
 
-    // Step 3: Create a Job linked to the customer
     const jobNotes = [
       service ? `Service Requested: ${service}` : "",
       address ? `Property Address: ${address}` : "",
