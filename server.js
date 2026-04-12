@@ -10,7 +10,9 @@ const GRANT_KEY = process.env.JOBTREAD_KEY;
 const ORG_SLUG = "FXR-Construction-Inc";
 
 // ─── Health check
-app.get("/", (req, res) => res.json({ status: "FXR Server running" }));
+const path = require("path");
+app.use(express.static(path.join(__dirname)));
+app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 // ─── Submit lead from website form → JobTread
 app.post("/api/submit-lead", async (req, res) => {
