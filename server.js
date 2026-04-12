@@ -1,18 +1,35 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json());
+app.use(express.static(path.join(__dirname)));
+app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 const JOBTREAD_API = "https://api.jobtread.com/pave";
 const GRANT_KEY = process.env.JOBTREAD_KEY;
-const ORG_SLUG = "FXR-Construction-Inc";
+
+// ─── Helper to call JobTread API safely
+async function jtQuery(query) {
+  const res = await fetch(JOBTREAD_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query })
+  });
+  const text = await res.text();
+  console.log("JobTread response:", text);
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("JobTread returned non-JSON:", text);
+    return null;
+  }
+}
 
 // ─── Health check
-const path = require("path");
-app.use(express.static(path.join(__dirname)));
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
+app.get("/health", (req, res) => res.json({ status: "FXR Server running" }));
 
 // ─── Submit lead from website form → JobTread
 app.post("/api/submit-lead", async (req, res) => {
@@ -23,93 +40,81 @@ app.post("/api/submit-lead", async (req, res) => {
   }
 
   try {
-    const orgRes = await fetch(JOBTREAD_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: {
-          $: { grantKey: GRANT_KEY },
-          organization: {
-            $: { urlSlug: ORG_SLUG },
-            id: {},
-            name: {}
-          }
-        }
-      })
-    });
-
-    const orgData = await orgRes.json();
-    const orgId = orgData?.organization?.id;
-
-    if (!orgId) {
-      console.error("Could not find org ID", orgData);
-      return res.status(500).json({ error: "Could not locate JobTread organization." });
-    }
-
-    const customerRes = await fetch(JOBTREAD_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: {
-          $: { grantKey: GRANT_KEY },
-          createAccount: {
-            $: {
-              organizationId: orgId,
-              name: name,
-              type: "customer",
-              email: email || null,
-              phone: phone || null,
-            },
-            createdAccount: {
-              id: {},
-              name: {}
+    // Step 1: Get current grant info to find org ID
+    const grantData = await jtQuery({
+      $: { grantKey: GRANT_KEY },
+      currentGrant: {
+        id: {},
+        user: {
+          id: {},
+          memberships: {
+            nodes: {
+              organization: { id: {}, name: {} }
             }
           }
         }
-      })
+      }
     });
 
-    const customerData = await customerRes.json();
-    const customerId = customerData?.createAccount?.createdAccount?.id;
-
-    if (!customerId) {
-      console.error("Could not create customer", customerData);
-      return res.status(500).json({ error: "Could not create customer in JobTread." });
+    if (!grantData) {
+      return res.status(500).json({ error: "Could not connect to JobTread." });
     }
 
+    const nodes = grantData?.currentGrant?.user?.memberships?.nodes;
+    if (!nodes || nodes.length === 0) {
+      console.error("No org found in grant data:", JSON.stringify(grantData));
+      return res.status(500).json({ error: "Could not find organization." });
+    }
+
+    const orgId = nodes[0].organization.id;
+    const orgName = nodes[0].organization.name;
+    console.log(`✅ Org found: ${orgName} (${orgId})`);
+
+    // Step 2: Create customer
+    const customerData = await jtQuery({
+      $: { grantKey: GRANT_KEY },
+      createAccount: {
+        $: {
+          organizationId: orgId,
+          name: name,
+          type: "customer",
+          ...(email && { email }),
+          ...(phone && { phone }),
+        },
+        createdAccount: { id: {}, name: {} }
+      }
+    });
+
+    const customerId = customerData?.createAccount?.createdAccount?.id;
+    if (!customerId) {
+      console.error("Could not create customer:", JSON.stringify(customerData));
+      return res.status(500).json({ error: "Could not create customer in JobTread." });
+    }
+    console.log(`✅ Customer created: ${customerId}`);
+
+    // Step 3: Create job
     const jobNotes = [
       service ? `Service Requested: ${service}` : "",
       address ? `Property Address: ${address}` : "",
       message ? `Notes: ${message}` : "",
     ].filter(Boolean).join("\n");
 
-    const jobRes = await fetch(JOBTREAD_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: {
-          $: { grantKey: GRANT_KEY },
-          createJob: {
-            $: {
-              organizationId: orgId,
-              accountId: customerId,
-              name: `${service} – ${name}`,
-              description: jobNotes,
-            },
-            createdJob: {
-              id: {},
-              name: {}
-            }
-          }
-        }
-      })
+    const jobData = await jtQuery({
+      $: { grantKey: GRANT_KEY },
+      createJob: {
+        $: {
+          organizationId: orgId,
+          accountId: customerId,
+          name: `${service} – ${name}`,
+          description: jobNotes,
+        },
+        createdJob: { id: {}, name: {} }
+      }
     });
 
-    const jobData = await jobRes.json();
     const jobId = jobData?.createJob?.createdJob?.id;
-
     if (!jobId) {
-      console.error("Could not create job", jobData);
+      console.error("Could not create job:", JSON.stringify(jobData));
       return res.status(500).json({ error: "Customer created but job could not be created." });
     }
 
