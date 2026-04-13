@@ -35,7 +35,7 @@ async function jtQuery(query) {
 // ─── Health check
 app.get("/health", (req, res) => res.json({ status: "FXR Server running" }));
 
-// ─── Cloudinary signature for secure upload
+// ─── Sign upload (kept as backup)
 app.post("/api/sign-upload", (req, res) => {
   const { folder } = req.body;
   const timestamp = Math.round(new Date().getTime() / 1000);
@@ -43,7 +43,6 @@ app.post("/api/sign-upload", (req, res) => {
   const str = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join("&") + API_SECRET;
   const signature = crypto.createHash("sha1").update(str).digest("hex");
   console.log("Sign upload called, folder:", folder);
-  console.log("Signature generated:", signature.substring(0, 8));
   res.json({ signature, timestamp, api_key: API_KEY, cloud_name: CLOUD_NAME });
 });
 
@@ -57,12 +56,31 @@ app.get("/api/portfolio", async (req, res) => {
       headers: { Authorization: `Basic ${auth}` }
     });
     const data = await response.json();
-    console.log("Cloudinary response:", JSON.stringify(data));
+    console.log("Cloudinary portfolio response:", JSON.stringify(data).substring(0, 300));
     res.json(data.resources || []);
   } catch (err) {
     console.error("Cloudinary fetch error:", err);
     res.json([]);
   }
+});
+
+// ─── Delete photo from Cloudinary
+app.post("/api/delete-photo", async (req, res) => {
+  const { public_id } = req.body;
+  const timestamp = Math.round(new Date().getTime() / 1000);
+  const str = `public_id=${public_id}&timestamp=${timestamp}${API_SECRET}`;
+  const signature = crypto.createHash("sha1").update(str).digest("hex");
+  const formData = new URLSearchParams();
+  formData.append("public_id", public_id);
+  formData.append("signature", signature);
+  formData.append("timestamp", timestamp);
+  formData.append("api_key", API_KEY);
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/destroy`, {
+    method: "POST",
+    body: formData
+  });
+  const data = await response.json();
+  res.json({ success: data.result === "ok" });
 });
 
 // ─── Submit lead from website form → JobTread
@@ -112,6 +130,7 @@ app.post("/api/submit-lead", async (req, res) => {
 
     console.log(`✅ New lead: ${name} | Job: ${jobId}`);
     return res.json({ success: true, customerId, jobId });
+
   } catch (err) {
     console.error("Server error:", err);
     return res.status(500).json({ error: "Server error. Please try again." });
