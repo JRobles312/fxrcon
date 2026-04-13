@@ -229,7 +229,45 @@
       grid.innerHTML = '<div class="empty">Could not load photos.</div>';
     }
   }
-
+ async function deletePhoto(publicId) {
+    if (!confirm('Are you sure you want to delete this photo?')) return;
+    const res = await fetch('/api/delete-photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ public_id: publicId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('Photo deleted!');
+      loadPortfolio();
+    } else {
+      alert('Could not delete photo. Try again.');
+    }
+  }
+Then go to GitHub → server.js → ✏️ edit → find the /health route and add this right below it:
+javascript// ─── Delete photo from Cloudinary
+app.post("/api/delete-photo", async (req, res) => {
+  const { public_id } = req.body;
+  const timestamp = Math.round(new Date().getTime() / 1000);
+  const str = `public_id=${public_id}&timestamp=${timestamp}${API_SECRET}`;
+  const signature = crypto.createHash("sha1").update(str).digest("hex");
+  const formData = new URLSearchParams();
+  formData.append("public_id", public_id);
+  formData.append("signature", signature);
+  formData.append("timestamp", timestamp);
+  formData.append("api_key", API_KEY);
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/destroy`, {
+    method: "POST",
+    body: formData
+  });
+  const data = await response.json();
+  if (data.result === "ok") {
+    res.json({ success: true });
+  } else {
+    res.json({ success: false });
+  }
+});
+Commit both files and test the admin page. Each photo will now have a red Delete button! 👍Sonnet 4.6Extended
   loadPortfolio();
 </script>
 </body>
