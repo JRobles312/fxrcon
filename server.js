@@ -52,7 +52,7 @@ app.get("/api/portfolio", async (req, res) => {
   try {
     const auth = Buffer.from(`${API_KEY}:${API_SECRET}`).toString("base64");
     const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?prefix=fxr-portfolio&max_results=100`,
+     `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?type=upload&prefix=fxr-portfolio&max_results=100`
       { headers: { Authorization: `Basic ${auth}` } }
     );
     const data = await response.json();
