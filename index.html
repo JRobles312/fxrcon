@@ -441,7 +441,7 @@
     btn.disabled = true;
     btn.textContent = 'Submitting...';
     try {
-      const res = await fetch('https://fxrcon-production.up.railway.app/api/submit-lead', {
+      const res = await fetch('https://fxrcon-construction.onrender.com/api/submit-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
