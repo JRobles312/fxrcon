@@ -51,11 +51,13 @@ app.post("/api/sign-upload", (req, res) => {
 app.get("/api/portfolio", async (req, res) => {
   try {
     const auth = Buffer.from(`${API_KEY}:${API_SECRET}`).toString("base64");
-    const response = await fetch(
-     `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?type=upload&prefix=fxr-portfolio&max_results=100`
-      { headers: { Authorization: `Basic ${auth}` } }
-    );
+    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?type=upload&prefix=fxr-portfolio&max_results=100`;
+    console.log("Fetching Cloudinary:", url);
+    const response = await fetch(url, {
+      headers: { Authorization: `Basic ${auth}` }
+    });
     const data = await response.json();
+    console.log("Cloudinary response:", JSON.stringify(data));
     res.json(data.resources || []);
   } catch (err) {
     console.error("Cloudinary fetch error:", err);
