@@ -84,11 +84,10 @@ app.post("/api/submit-lead", async (req, res) => {
       message ? `Notes: ${message}` : "",
     ].filter(Boolean).join("\n");
 
-    const jobData = await jtQuery({
+ const jobData = await jtQuery({
       $: { grantKey: GRANT_KEY },
       createJob: {
         $: {
-          accountId: customerId,
           locationId: locationId,
           name: `${service} – ${name}`,
           description: jobNotes,
