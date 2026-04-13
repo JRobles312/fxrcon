@@ -88,11 +88,10 @@ app.post("/api/submit-lead", async (req, res) => {
       $: { grantKey: GRANT_KEY },
       createJob: {
         $: {
-          organizationId: ORG_ID,
           accountId: customerId,
+          locationId: locationId,
           name: `${service} – ${name}`,
           description: jobNotes,
-          ...(locationId && { locationId }),
         },
         createdJob: { id: {}, name: {} }
       }
