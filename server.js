@@ -1,18 +1,24 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 app.use(cors({ origin: "*" }));
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname)));
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
+app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "admin.html")));
 
 const JOBTREAD_API = "https://api.jobtread.com/pave";
 const GRANT_KEY = process.env.JOBTREAD_KEY;
 const ORG_ID = "22PKKRUxRtz8";
+const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
+const API_KEY = process.env.CLOUDINARY_API_KEY;
+const API_SECRET = process.env.CLOUDINARY_API_SECRET;
 
 console.log("Grant key starts with:", GRANT_KEY ? GRANT_KEY.substring(0, 8) : "NOT FOUND");
+console.log("Cloudinary cloud:", CLOUD_NAME || "NOT FOUND");
 
 async function jtQuery(query) {
   const res = await fetch(JOBTREAD_API, {
@@ -22,89 +28,87 @@ async function jtQuery(query) {
   });
   const text = await res.text();
   console.log("JobTread response:", text);
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    console.error("JobTread returned non-JSON:", text);
-    return null;
-  }
+  try { return JSON.parse(text); }
+  catch (e) { console.error("JobTread returned non-JSON:", text); return null; }
 }
 
+// ─── Health check
 app.get("/health", (req, res) => res.json({ status: "FXR Server running" }));
 
+// ─── Cloudinary signature for secure upload
+app.post("/api/sign-upload", (req, res) => {
+  const { folder, public_id } = req.body;
+  const timestamp = Math.round(new Date().getTime() / 1000);
+  const params = { folder: folder || "fxr-portfolio", timestamp };
+  if (public_id) params.public_id = public_id;
+  const str = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join("&") + API_SECRET;
+  const signature = crypto.createHash("sha1").update(str).digest("hex");
+  res.json({ signature, timestamp, api_key: API_KEY, cloud_name: CLOUD_NAME });
+});
+
+// ─── Get all portfolio photos from Cloudinary
+app.get("/api/portfolio", async (req, res) => {
+  try {
+    const auth = Buffer.from(`${API_KEY}:${API_SECRET}`).toString("base64");
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?prefix=fxr-portfolio&max_results=100`,
+      { headers: { Authorization: `Basic ${auth}` } }
+    );
+    const data = await response.json();
+    res.json(data.resources || []);
+  } catch (err) {
+    console.error("Cloudinary fetch error:", err);
+    res.json([]);
+  }
+});
+
+// ─── Submit lead from website form → JobTread
 app.post("/api/submit-lead", async (req, res) => {
   const { name, email, phone, address, service, message } = req.body;
-
   if (!name || !phone || !service) {
     return res.status(400).json({ error: "Name, phone, and service are required." });
   }
-
   try {
-    // Step 1: Create customer
     const customerData = await jtQuery({
       $: { grantKey: GRANT_KEY },
       createAccount: {
-        $: {
-          organizationId: ORG_ID,
-          name: name,
-          type: "customer",
-        },
+        $: { organizationId: ORG_ID, name, type: "customer" },
         createdAccount: { id: {}, name: {} }
       }
     });
-
     const customerId = customerData?.createAccount?.createdAccount?.id;
-    if (!customerId) {
-      console.error("Could not create customer:", JSON.stringify(customerData));
-      return res.status(500).json({ error: "Could not create customer in JobTread." });
-    }
+    if (!customerId) return res.status(500).json({ error: "Could not create customer in JobTread." });
     console.log(`✅ Customer created: ${customerId}`);
 
-  // Step 2: Create location
     const locationData = await jtQuery({
       $: { grantKey: GRANT_KEY },
       createLocation: {
-        $: {
-          accountId: customerId,
-          name: address || "TBD",
-        },
+        $: { accountId: customerId, name: address || "TBD" },
         createdLocation: { id: {}, name: {} }
       }
     });
-
     const locationId = locationData?.createLocation?.createdLocation?.id;
-    console.log("Location ID:", locationId);
 
-    // Step 3: Create job
     const jobNotes = [
-      service ? `Service Requested: ${service}` : "",
+      `Service Requested: ${service}`,
       address ? `Property Address: ${address}` : "",
       email ? `Email: ${email}` : "",
       phone ? `Phone: ${phone}` : "",
       message ? `Notes: ${message}` : "",
     ].filter(Boolean).join("\n");
 
- const jobData = await jtQuery({
+    const jobData = await jtQuery({
       $: { grantKey: GRANT_KEY },
       createJob: {
-        $: {
-          locationId: locationId,
-          name: `${service} – ${name}`,
-          description: jobNotes,
-        },
+        $: { locationId, name: `${service} – ${name}`, description: jobNotes },
         createdJob: { id: {}, name: {} }
       }
     });
-
     const jobId = jobData?.createJob?.createdJob?.id;
-    if (!jobId) {
-      console.error("Could not create job:", JSON.stringify(jobData));
-      return res.status(500).json({ error: "Customer created but job could not be created." });
-    }
+    if (!jobId) return res.status(500).json({ error: "Customer created but job could not be created." });
 
     console.log(`✅ New lead: ${name} | Job: ${jobId}`);
     return res.json({ success: true, customerId, jobId });
-
   } catch (err) {
     console.error("Server error:", err);
     return res.status(500).json({ error: "Server error. Please try again." });
