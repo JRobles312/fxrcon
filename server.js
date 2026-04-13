@@ -10,10 +10,10 @@ app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 const JOBTREAD_API = "https://api.jobtread.com/pave";
 const GRANT_KEY = process.env.JOBTREAD_KEY;
-console.log("Grant key starts with:", GRANT_KEY ? GRANT_KEY.substring(0, 8) : "NOT FOUND");
 const ORG_ID = "22PKKRUxRtz8";
 
-// ─── Helper to call JobTread API safely
+console.log("Grant key starts with:", GRANT_KEY ? GRANT_KEY.substring(0, 8) : "NOT FOUND");
+
 async function jtQuery(query) {
   const res = await fetch(JOBTREAD_API, {
     method: "POST",
@@ -30,10 +30,8 @@ async function jtQuery(query) {
   }
 }
 
-// ─── Health check
 app.get("/health", (req, res) => res.json({ status: "FXR Server running" }));
 
-// ─── Submit lead from website form → JobTread
 app.post("/api/submit-lead", async (req, res) => {
   const { name, email, phone, address, service, message } = req.body;
 
@@ -47,7 +45,7 @@ app.post("/api/submit-lead", async (req, res) => {
       $: { grantKey: GRANT_KEY },
       createAccount: {
         $: {
-             organizationId: ORG_ID,
+          organizationId: ORG_ID,
           name: name,
           type: "customer",
         },
@@ -62,10 +60,28 @@ app.post("/api/submit-lead", async (req, res) => {
     }
     console.log(`✅ Customer created: ${customerId}`);
 
-    // Step 2: Create job
+    // Step 2: Create location
+    const locationData = await jtQuery({
+      $: { grantKey: GRANT_KEY },
+      createLocation: {
+        $: {
+          organizationId: ORG_ID,
+          accountId: customerId,
+          name: address || "Site Location",
+        },
+        createdLocation: { id: {} }
+      }
+    });
+
+    const locationId = locationData?.createLocation?.createdLocation?.id;
+    console.log("Location ID:", locationId);
+
+    // Step 3: Create job
     const jobNotes = [
       service ? `Service Requested: ${service}` : "",
       address ? `Property Address: ${address}` : "",
+      email ? `Email: ${email}` : "",
+      phone ? `Phone: ${phone}` : "",
       message ? `Notes: ${message}` : "",
     ].filter(Boolean).join("\n");
 
@@ -77,6 +93,7 @@ app.post("/api/submit-lead", async (req, res) => {
           accountId: customerId,
           name: `${service} – ${name}`,
           description: jobNotes,
+          ...(locationId && { locationId }),
         },
         createdJob: { id: {}, name: {} }
       }
