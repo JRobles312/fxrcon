@@ -9,8 +9,8 @@ app.use(express.static(path.join(__dirname)));
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 const JOBTREAD_API = "https://api.jobtread.com/pave";
-const GRANT_KEY = "22TMV89U4djqZwXsFx34FVi8jLP2RgYBDG";
-console.log("Grant key loaded:", GRANT_KEY ? GRANT_KEY.substring(0, 6) + "..." : "NOT FOUND");
+const GRANT_KEY = process.env.JOBTREAD_KEY;
+const ORG_ID = "22PKKRUxRtz8";
 
 // ─── Helper to call JobTread API safely
 async function jtQuery(query) {
@@ -41,42 +41,12 @@ app.post("/api/submit-lead", async (req, res) => {
   }
 
   try {
-    // Step 1: Get current grant info to find org ID
-    const grantData = await jtQuery({
-      $: { grantKey: GRANT_KEY },
-      currentGrant: {
-        id: {},
-        user: {
-          id: {},
-          memberships: {
-            nodes: {
-              organization: { id: {}, name: {} }
-            }
-          }
-        }
-      }
-    });
-
-    if (!grantData) {
-      return res.status(500).json({ error: "Could not connect to JobTread." });
-    }
-
-    const nodes = grantData?.currentGrant?.user?.memberships?.nodes;
-    if (!nodes || nodes.length === 0) {
-      console.error("No org found in grant data:", JSON.stringify(grantData));
-      return res.status(500).json({ error: "Could not find organization." });
-    }
-
-    const orgId = nodes[0].organization.id;
-    const orgName = nodes[0].organization.name;
-    console.log(`✅ Org found: ${orgName} (${orgId})`);
-
-    // Step 2: Create customer
+    // Step 1: Create customer
     const customerData = await jtQuery({
       $: { grantKey: GRANT_KEY },
       createAccount: {
         $: {
-          organizationId: orgId,
+          organizationId: ORG_ID,
           name: name,
           type: "customer",
           ...(email && { email }),
@@ -93,7 +63,7 @@ app.post("/api/submit-lead", async (req, res) => {
     }
     console.log(`✅ Customer created: ${customerId}`);
 
-    // Step 3: Create job
+    // Step 2: Create job
     const jobNotes = [
       service ? `Service Requested: ${service}` : "",
       address ? `Property Address: ${address}` : "",
@@ -104,7 +74,7 @@ app.post("/api/submit-lead", async (req, res) => {
       $: { grantKey: GRANT_KEY },
       createJob: {
         $: {
-          organizationId: orgId,
+          organizationId: ORG_ID,
           accountId: customerId,
           name: `${service} – ${name}`,
           description: jobNotes,
