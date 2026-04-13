@@ -10,6 +10,7 @@ app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 const JOBTREAD_API = "https://api.jobtread.com/pave";
 const GRANT_KEY = process.env.JOBTREAD_KEY;
+console.log("Grant key starts with:", GRANT_KEY ? GRANT_KEY.substring(0, 8) : "NOT FOUND");
 const ORG_ID = "22PKKRUxRtz8";
 
 // ─── Helper to call JobTread API safely
