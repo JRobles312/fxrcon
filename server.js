@@ -37,12 +37,13 @@ app.get("/health", (req, res) => res.json({ status: "FXR Server running" }));
 
 // ─── Cloudinary signature for secure upload
 app.post("/api/sign-upload", (req, res) => {
-  const { folder, public_id } = req.body;
+  const { folder } = req.body;
   const timestamp = Math.round(new Date().getTime() / 1000);
   const params = { folder: folder || "fxr-portfolio", timestamp };
-  if (public_id) params.public_id = public_id;
   const str = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join("&") + API_SECRET;
   const signature = crypto.createHash("sha1").update(str).digest("hex");
+  console.log("Sign upload called, folder:", folder);
+  console.log("Signature generated:", signature.substring(0, 8));
   res.json({ signature, timestamp, api_key: API_KEY, cloud_name: CLOUD_NAME });
 });
 
