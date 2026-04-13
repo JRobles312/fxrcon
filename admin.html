@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FXR Admin – Portfolio Upload</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #F4F1EC; color: #1A2535; min-height: 100vh; }
+    header { background: #0D3B6E; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { color: white; font-size: 20px; font-weight: 800; }
+    header span { color: #5B9BD5; font-size: 13px; }
+    .container { max-width: 900px; margin: 40px auto; padding: 0 24px; }
+    .card { background: white; border-radius: 14px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); border: 1px solid #DDEAF7; margin-bottom: 32px; }
+    .card h2 { font-size: 20px; font-weight: 800; color: #0D3B6E; margin-bottom: 20px; }
+    .drop-zone { border: 2px dashed #1A6AB5; border-radius: 12px; padding: 48px 24px; text-align: center; cursor: pointer; transition: all 0.2s; background: #EEF4FF; }
+    .drop-zone:hover, .drop-zone.dragover { background: #D0DFF0; border-color: #0D3B6E; }
+    .drop-zone-icon { font-size: 48px; margin-bottom: 12px; }
+    .drop-zone-text { color: #1A6AB5; font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+    .drop-zone-sub { color: #6B7280; font-size: 13px; }
+    input[type="file"] { display: none; }
+    .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 20px; }
+    label { font-weight: 600; font-size: 13px; color: #0D3B6E; display: block; margin-bottom: 5px; }
+    input, select { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1.5px solid #DDEAF7; font-size: 14px; color: #1A2535; background: white; outline: none; font-family: inherit; }
+    .btn-upload { background: #1A6AB5; color: white; border: none; border-radius: 8px; padding: 12px 28px; font-weight: 700; font-size: 15px; cursor: pointer; margin-top: 20px; width: 100%; }
+    .btn-upload:disabled { opacity: 0.6; cursor: not-allowed; }
+    .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-top: 20px; }
+    .preview-item { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1; }
+    .preview-item img { width: 100%; height: 100%; object-fit: cover; }
+    .preview-item .remove { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .progress { margin-top: 16px; display: none; }
+    .progress-bar-wrap { background: #DDEAF7; border-radius: 20px; height: 10px; overflow: hidden; }
+    .progress-bar { background: #1A6AB5; height: 100%; width: 0%; transition: width 0.3s; border-radius: 20px; }
+    .progress-text { font-size: 13px; color: #6B7280; margin-top: 6px; text-align: center; }
+    .success-msg { background: #D1FAE5; border: 1.5px solid #6EE7B7; border-radius: 8px; padding: 12px 16px; color: #065F46; font-weight: 600; font-size: 14px; margin-top: 16px; display: none; }
+    .portfolio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+    .portfolio-card { border-radius: 12px; overflow: hidden; border: 1px solid #DDEAF7; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .portfolio-card img { width: 100%; height: 160px; object-fit: cover; }
+    .portfolio-card-info { padding: 12px; background: white; }
+    .portfolio-card-title { font-weight: 700; font-size: 14px; color: #0D3B6E; margin-bottom: 2px; }
+    .portfolio-card-sub { font-size: 12px; color: #6B7280; }
+    .empty { text-align: center; color: #6B7280; padding: 40px; font-size: 15px; }
+    .tag { background: #EEF4FF; border-radius: 20px; padding: 2px 10px; font-size: 11px; color: #1A6AB5; font-weight: 600; display: inline-block; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🏗️ FXR Construction – Admin</h1>
+  <span>Portfolio Photo Manager</span>
+</header>
+
+<div class="container">
+
+  <!-- UPLOAD SECTION -->
+  <div class="card">
+    <h2>📸 Upload Project Photos</h2>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="drop-zone-icon">📁</div>
+      <div class="drop-zone-text">Click or drag & drop photos here</div>
+      <div class="drop-zone-sub">JPG, PNG, HEIC supported · Multiple photos at once</div>
+    </div>
+    <input type="file" id="fileInput" multiple accept="image/*"/>
+    <div class="preview-grid" id="previewGrid"></div>
+
+    <div class="form-row">
+      <div>
+        <label>Project Name *</label>
+        <input type="text" id="projectName" placeholder="e.g. Bonita Framing Project"/>
+      </div>
+      <div>
+        <label>City *</label>
+        <input type="text" id="projectCity" placeholder="e.g. San Jose"/>
+      </div>
+      <div>
+        <label>Project Type *</label>
+        <select id="projectType">
+          <option value="">Select type...</option>
+          <option>Structural</option>
+          <option>Concrete</option>
+          <option>Roofing</option>
+          <option>Compliance</option>
+          <option>Remodel</option>
+          <option>Maintenance</option>
+          <option>Fencing</option>
+          <option>Commercial</option>
+          <option>Framing</option>
+          <option>Before & After</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="progress" id="progress">
+      <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="progress-text" id="progressText">Uploading...</div>
+    </div>
+    <div class="success-msg" id="successMsg">✅ Photos uploaded successfully! They are now live on the portfolio.</div>
+    <button class="btn-upload" id="uploadBtn" onclick="uploadPhotos()">📤 Upload to Portfolio</button>
+  </div>
+
+  <!-- CURRENT PORTFOLIO -->
+  <div class="card">
+    <h2>🖼️ Current Portfolio Photos</h2>
+    <div id="portfolioGrid" class="portfolio-grid">
+      <div class="empty">Loading photos...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let selectedFiles = [];
+
+  // Drag and drop
+  const dropZone = document.getElementById('dropZone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  document.getElementById('fileInput').addEventListener('change', e => handleFiles(e.target.files));
+
+  function handleFiles(files) {
+    selectedFiles = [...selectedFiles, ...Array.from(files)];
+    renderPreviews();
+  }
+
+  function renderPreviews() {
+    const grid = document.getElementById('previewGrid');
+    grid.innerHTML = '';
+    selectedFiles.forEach((file, i) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const div = document.createElement('div');
+        div.className = 'preview-item';
+        div.innerHTML = `<img src="${e.target.result}"/><button class="remove" onclick="removeFile(${i})">×</button>`;
+        grid.appendChild(div);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function removeFile(i) {
+    selectedFiles.splice(i, 1);
+    renderPreviews();
+  }
+
+  async function uploadPhotos() {
+    const name = document.getElementById('projectName').value.trim();
+    const city = document.getElementById('projectCity').value.trim();
+    const type = document.getElementById('projectType').value;
+
+    if (!name || !city || !type) return alert('Please fill in project name, city, and type.');
+    if (selectedFiles.length === 0) return alert('Please select at least one photo.');
+
+    const btn = document.getElementById('uploadBtn');
+    btn.disabled = true;
+    document.getElementById('progress').style.display = 'block';
+    document.getElementById('successMsg').style.display = 'none';
+
+    const folder = `fxr-portfolio/${type}/${name} - ${city}`.replace(/\s+/g, '-');
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      document.getElementById('progressText').textContent = `Uploading ${i + 1} of ${selectedFiles.length}...`;
+      document.getElementById('progressBar').style.width = `${((i) / selectedFiles.length) * 100}%`;
+
+      // Get signature from server
+      const sigRes = await fetch('/api/sign-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder })
+      });
+      const { signature, timestamp, api_key, cloud_name } = await sigRes.json();
+
+      // Upload to Cloudinary
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('signature', signature);
+      formData.append('timestamp', timestamp);
+      formData.append('api_key', api_key);
+      formData.append('folder', folder);
+      formData.append('context', `project=${name}|city=${city}|type=${type}`);
+
+      await fetch(`https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`, {
+        method: 'POST',
+        body: formData
+      });
+    }
+
+    document.getElementById('progressBar').style.width = '100%';
+    document.getElementById('progressText').textContent = 'Done!';
+    document.getElementById('successMsg').style.display = 'block';
+    btn.disabled = false;
+    selectedFiles = [];
+    document.getElementById('previewGrid').innerHTML = '';
+    document.getElementById('projectName').value = '';
+    document.getElementById('projectCity').value = '';
+    document.getElementById('projectType').value = '';
+    loadPortfolio();
+  }
+
+  async function loadPortfolio() {
+    const grid = document.getElementById('portfolioGrid');
+    grid.innerHTML = '<div class="empty">Loading...</div>';
+    try {
+      const res = await fetch('/api/portfolio');
+      const photos = await res.json();
+      if (photos.length === 0) {
+        grid.innerHTML = '<div class="empty">No photos uploaded yet.</div>';
+        return;
+      }
+      grid.innerHTML = photos.map(p => {
+        const parts = p.public_id.split('/');
+        const projectFolder = parts.slice(1).join('/');
+        return `
+          <div class="portfolio-card">
+            <img src="${p.secure_url}" alt="${projectFolder}"/>
+            <div class="portfolio-card-info">
+              <div class="portfolio-card-title">${projectFolder.replace(/-/g, ' ')}</div>
+              <span class="tag">${parts[1] || 'General'}</span>
+            </div>
+          </div>`;
+      }).join('');
+    } catch (e) {
+      grid.innerHTML = '<div class="empty">Could not load photos.</div>';
+    }
+  }
+
+  loadPortfolio();
+</script>
+</body>
+</html>
