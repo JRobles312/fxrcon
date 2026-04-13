@@ -46,10 +46,9 @@ app.post("/api/submit-lead", async (req, res) => {
       $: { grantKey: GRANT_KEY },
       createAccount: {
         $: {
-           organizationId: ORG_ID,
+             organizationId: ORG_ID,
           name: name,
           type: "customer",
-          ...(phone && { phone }),
         },
         createdAccount: { id: {}, name: {} }
       }
