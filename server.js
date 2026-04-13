@@ -60,12 +60,11 @@ app.post("/api/submit-lead", async (req, res) => {
     }
     console.log(`✅ Customer created: ${customerId}`);
 
-   // Step 2: Create location
+  // Step 2: Create location
     const locationData = await jtQuery({
       $: { grantKey: GRANT_KEY },
       createLocation: {
         $: {
-          organizationId: ORG_ID,
           accountId: customerId,
           name: address || "TBD",
         },
@@ -73,7 +72,6 @@ app.post("/api/submit-lead", async (req, res) => {
       }
     });
 
-    console.log("Full location response:", JSON.stringify(locationData));
     const locationId = locationData?.createLocation?.createdLocation?.id;
     console.log("Location ID:", locationId);
 
